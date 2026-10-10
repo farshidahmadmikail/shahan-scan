@@ -9,19 +9,19 @@
     body {
       font-family: Tahoma, Arial, sans-serif;
       background: #f1f5f9;
-      text-align: center;
-      padding: 20px;
       margin: 0;
+      padding: 16px;
+      text-align: center;
     }
     .card {
       max-width: 450px;
       margin: 20px auto;
-      background: white;
       padding: 20px;
+      background: white;
       border-radius: 15px;
     }
     h1 { color: #166534; }
-    button, input {
+    input, button {
       box-sizing: border-box;
       width: 100%;
       padding: 13px;
@@ -29,78 +29,223 @@
       border-radius: 8px;
       font-size: 16px;
     }
+    input { border: 1px solid #bbb; }
     button {
+      border: 0;
       background: #166534;
       color: white;
-      border: 0;
+      cursor: pointer;
     }
-    input { border: 1px solid #bbb; }
-    #reader { margin-top: 20px; }
+    #reader { margin-top: 16px; }
     #result {
       margin-top: 18px;
+      text-align: right;
+      line-height: 2;
       overflow-wrap: anywhere;
-      font-weight: bold;
     }
+    .hidden { display: none; }
+    .error { color: #b91c1c; }
+    .success { color: #166534; }
   </style>
 </head>
 <body>
   <div class="card">
     <h1>شاهان اسکن</h1>
-    <p>اسکن بارکد محصولات</p>
+    <p>سیستم جست‌وجوی محصولات شرکت</p>
 
-    <button onclick="startScan()">شروع اسکن با دوربین</button>
-    <div id="reader"></div>
+    <section id="loginBox">
+      <h3>ورود فروشنده</h3>
+      <input id="username" placeholder="نام کاربری"
+             autocomplete="username">
+      <input id="password" type="password"
+             placeholder="رمز عبور"
+             autocomplete="current-password">
+      <button onclick="login()">ورود به سیستم</button>
+    </section>
 
-    <input id="barcode" placeholder="یا بارکد را دستی وارد کنید">
-    <button onclick="showCode()">بررسی بارکد</button>
+    <section id="scannerBox" class="hidden">
+      <p id="welcome"></p>
+      <button onclick="startScan()">شروع اسکن با دوربین</button>
+      <div id="reader"></div>
+      <input id="barcode" placeholder="بارکد را دستی وارد کنید">
+      <button onclick="lookupProduct()">بررسی محصول</button>
+      <button onclick="logout()" style="background:#64748b">
+        خروج از حساب
+      </button>
+    </section>
 
-    <div id="result"></div>
+    <div id="result" role="status"></div>
   </div>
 
-  <script>
-    let scanner = null;
-    let scanned = false;
+<script>
+const API = "https://descending-configure-got-availability.trycloudflare.com";
 
-    async function startScan() {
-      const result = document.getElementById("result");
-      result.textContent = "در حال آماده‌سازی دوربین...";
+let token = "";
+let scanner = null;
+let busy = false;
 
-      try {
-        if (!scanner) {
-          scanner = new Html5Qrcode("reader");
+const result = document.getElementById("result");
+
+function message(text, type = "") {
+  result.className = type;
+  result.textContent = text;
+}
+
+async function login() {
+  const username = document.getElementById("username").value.trim();
+  const password = document.getElementById("password").value;
+
+  if (!username || !password) {
+    message("نام کاربری و رمز عبور را وارد کنید.", "error");
+    return;
+  }
+
+  message("در حال بررسی اطلاعات ورود...");
+
+  try {
+    const response = await fetch(API + "/api/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ username, password })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+      message(data.error || "ورود ناموفق بود.", "error");
+      return;
+    }
+
+    token = data.token;
+    document.getElementById("loginBox").classList.add("hidden");
+    document.getElementById("scannerBox").classList.remove("hidden");
+    document.getElementById("welcome").textContent =
+      "فروشنده: " + data.seller;
+    document.getElementById("password").value = "";
+
+    message("ورود موفق بود. بارکد محصول را اسکن کنید.", "success");
+  } catch (error) {
+    message("ارتباط با سرور برقرار نشد. سرور و تونل را بررسی کنید.", "error");
+  }
+}
+
+async function lookupProduct() {
+  if (!token) {
+    message("ابتدا وارد حساب شوید.", "error");
+    return;
+  }
+
+  const code = document.getElementById("barcode").value.trim();
+
+  if (!code) {
+    message("لطفاً بارکد را وارد یا اسکن کنید.", "error");
+    return;
+  }
+
+  message("در حال جست‌وجوی محصول...");
+
+  try {
+    const response = await fetch(
+      API + "/api/product/" + encodeURIComponent(code),
+      {
+        headers: {
+          "Authorization": "Bearer " + token
         }
-
-        scanned = false;
-
-        await scanner.start(
-          { facingMode: "environment" },
-          { fps: 10, qrbox: { width: 250, height: 150 } },
-          async function(decodedText) {
-            if (scanned) return;
-            scanned = true;
-
-            document.getElementById("barcode").value = decodedText;
-            result.textContent = "بارکد خوانده شد: " + decodedText;
-
-            try {
-              await scanner.stop();
-            } catch (e) {}
-          },
-          function(error) {}
-        );
-
-        result.textContent = "دوربین فعال است؛ بارکد را مقابل دوربین بگیر.";
-      } catch (error) {
-        result.textContent =
-          "دوربین فعال نشد. اجازه دسترسی دوربین را بررسی کن.";
       }
+    );
+
+    const data = await response.json();
+
+    if (response.status === 401) {
+      logout();
+      message("نشست شما منقضی شده است؛ دوباره وارد شوید.", "error");
+      return;
     }
 
-    function showCode() {
-      const code = document.getElementById("barcode").value.trim();
-      document.getElementById("result").textContent =
-        code ? "بارکد: " + code : "لطفاً بارکد را وارد کن.";
+    if (response.status === 404 || !data.found) {
+      message("محصولی با این بارکد پیدا نشد.", "error");
+      return;
     }
-  </script>
+
+    result.className = "success";
+    result.replaceChildren();
+
+    const title = document.createElement("h3");
+    title.textContent = data.name || "بدون نام";
+    result.appendChild(title);
+
+    const details = [
+      ["بارکد", data.code],
+      ["برند", data.brand],
+      ["موجودی", data.stock + " " + data.unit]
+    ];
+
+    for (const [label, value] of details) {
+      const line = document.createElement("p");
+      line.textContent = label + ": " + value;
+      result.appendChild(line);
+    }
+  } catch (error) {
+    message("ارتباط با سرور قطع است؛ وضعیت تونل را بررسی کنید.", "error");
+  }
+}
+
+async function startScan() {
+  if (!token) {
+    message("ابتدا وارد حساب شوید.", "error");
+    return;
+  }
+
+  try {
+    if (!window.Html5Qrcode) {
+      message("ابزار اسکن بارگذاری نشد؛ اتصال اینترنت را بررسی کنید.", "error");
+      return;
+    }
+
+    if (!scanner) scanner = new Html5Qrcode("reader");
+
+    message("در حال فعال‌کردن دوربین...");
+    await scanner.start(
+      { facingMode: "environment" },
+      { fps: 10, qrbox: { width: 250, height: 150 } },
+      async function(decodedText) {
+        if (busy) return;
+        busy = true;
+        document.getElementById("barcode").value = decodedText;
+
+        try {
+          await scanner.stop();
+        } catch (error) {}
+
+        busy = false;
+        await lookupProduct();
+      },
+      function() {}
+    );
+
+    message("دوربین فعال است؛ بارکد را مقابل آن بگیرید.", "success");
+  } catch (error) {
+    busy = false;
+    message("دوربین فعال نشد؛ اجازهٔ دسترسی دوربین را بررسی کنید.", "error");
+  }
+}
+
+async function logout() {
+  if (scanner) {
+    try {
+      if (scanner.isScanning) await scanner.stop();
+    } catch (error) {}
+  }
+
+  token = "";
+  document.getElementById("loginBox").classList.remove("hidden");
+  document.getElementById("scannerBox").classList.add("hidden");
+  document.getElementById("password").value = "";
+  document.getElementById("barcode").value = "";
+  message("از حساب خارج شدید.");
+}
+</script>
 </body>
 </html>
