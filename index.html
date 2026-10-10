@@ -1,1 +1,69 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>شاهان اسکن</title>
+  <style>
+    body {
+      font-family: Tahoma, Arial, sans-serif;
+      background: #f1f5f9;
+      margin: 0;
+      padding: 20px;
+      text-align: center;
+    }
+    .card {
+      max-width: 420px;
+      margin: 35px auto;
+      background: white;
+      padding: 24px;
+      border-radius: 14px;
+      box-shadow: 0 3px 12px #0001;
+    }
+    h1 { color: #14532d; }
+    input, button {
+      box-sizing: border-box;
+      width: 100%;
+      padding: 13px;
+      margin-top: 12px;
+      border-radius: 8px;
+      font-size: 16px;
+    }
+    input { border: 1px solid #ccc; }
+    button {
+      background: #166534;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    #result { margin-top: 20px; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>شاهان اسکن</h1>
+    <p>سیستم اسکن بارکد و مدیریت فروش</p>
 
+    <input id="barcode" type="text"
+      placeholder="بارکد جنس را وارد یا اسکن کنید">
+
+    <button onclick="checkBarcode()">بررسی بارکد</button>
+
+    <div id="result"></div>
+  </div>
+
+  <script>
+    function checkBarcode() {
+      const code = document.getElementById("barcode").value.trim();
+      const result = document.getElementById("result");
+
+      if (!code) {
+        result.textContent = "لطفاً بارکد را وارد یا اسکن کنید.";
+        return;
+      }
+
+      result.textContent = "بارکد واردشده: " + code;
+    }
+  </script>
+</body>
+</html>
